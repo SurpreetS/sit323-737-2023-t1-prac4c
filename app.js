@@ -1,17 +1,25 @@
 /*
     Name : Surpreet Singh
     St.ID : 218663803
+    unit : sit323
 */
 
+//Took a reference from this website:  https://blog.jscrambler.com/implementing-jwt-using-passport
+
+
 //importing libraries
-const express = require('express');
-const bodyParser = require('body-parser');
-
-const app = express(); //starting express server
-
-app.use(bodyParser.json())
-
+var express = require("express");
+var bodyParser = require("body-parser");
+var jwt = require("jwt-simple");
+var auth = require("./authorization.js")();
+var users = require("./data.js");
+var cfg = require("./configuration.js");
+var app = express();
 const winston = require("winston")  // importing winston library for logger
+
+app.use(bodyParser.json());
+app.use(auth.initialize());
+
 const logger = winston.createLogger({   // logger object
     level : 'info',
     format: winston.format.json(),
@@ -45,8 +53,40 @@ const divide = (n1,n2) => {
   return n1/n2;
 }
 
+
+// This is a route handler for POST requests to the "/token" endpoint.
+app.post("/token", function(req, res) {
+  // Check if the request contains an email and password in the request body.
+  if (req.body.email && req.body.password) {
+      // Extract the email and password from the request body.
+      var email = req.body.email;
+      var password = req.body.password;
+      // Search for a user with matching email and password in the users array.
+      var user = users.find(function(u) {
+          return u.email === email && u.password === password;
+      });
+      // If a user is found, create a payload containing their ID and encode it into a JSON Web Token (JWT).
+      if (user) {
+          var payload = {
+              id: user.id
+          };
+          var token = jwt.encode(payload, cfg.jwtSecret);
+          // Return the JWT in a JSON response.
+          res.json({
+              token: token
+          });
+      } else {
+          // If no user is found, return a 401 Unauthorized status code.
+          res.sendStatus(401);
+      }
+  } else {
+    // If the request does not contain an email and password, return a 401 Unauthorized status code.
+      res.sendStatus(401);
+  }
+});
+
 //API endpoint for addition microservice 
-app.get('/add', (req, res) => {
+app.get('/add', auth.authenticate(),(req, res) => {
 
     try {
           const n1 = parseFloat(req.query.n1); //assigning the variable n1 with 1st number from the request query
@@ -74,7 +114,7 @@ app.get('/add', (req, res) => {
   });
   
   //API endpoint for subtraction microservice 
-  app.get('/subtract', (req, res) => {
+  app.get('/subtract', auth.authenticate(), (req, res) => {
 
     try {
       const n1 = parseFloat(req.query.n1); //assigning the variable n1 with 1st number from the request query
@@ -102,7 +142,7 @@ app.get('/add', (req, res) => {
 
 
   //API endpoint for multiplication microservice 
-  app.get('/multiply', (req, res) => {
+  app.get('/multiply', auth.authenticate(), (req, res) => {
     try {
       const n1 = parseFloat(req.query.n1); //assigning the variable n1 with 1st number from the request query
       const n2 = parseFloat(req.query.n2); //assigning the variable n2 with 2nd number from the request query
@@ -128,7 +168,7 @@ app.get('/add', (req, res) => {
   });
   
   //API endpoint for division microservice 
-  app.get('/divide', (req, res) => {
+  app.get('/divide', auth.authenticate(), (req, res) => {
     try {
       const n1 = parseFloat(req.query.n1); //assigning the variable n1 with 1st number from the request query
       const n2 = parseFloat(req.query.n2); //assigning the variable n2 with 2nd number from the request query
@@ -156,4 +196,9 @@ app.get('/add', (req, res) => {
     }
   });
 
-  app.listen(3040, () => console.log('Server is running on port 3040'));
+
+app.listen(3000, function() {
+    console.log("My API is running...");
+});
+
+module.exports = app;
